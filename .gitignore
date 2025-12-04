@@ -1,0 +1,7 @@
+# Dossier Eclipse à ignorer
+.metadata/
+
+# Autres dossiers Eclipse à ignorer (bonne pratique)
+.settings/
+bin/
+target/
