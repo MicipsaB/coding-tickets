@@ -3,7 +3,7 @@
 <html>
 <head>
     <title>Créer / Modifier un événement</title>
-    <link rel="stylesheet" href="${pageContext.request.contextPath}/styles/style.css">
+    <link rel="stylesheet" href="/styles/style.css" />
 </head>
 <body>
 <div class="container">
