@@ -1,88 +1,275 @@
 package tickets.service;
 
+import tickets.dao.*;
 import tickets.model.*;
+
+import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.*;
-import java.util.concurrent.atomic.AtomicLong;
-import java.util.stream.Collectors;
+import java.util.List;
 
 public class TicketService {
-    private final List<Utilisateur> utilisateurs = Collections.synchronizedList(new ArrayList<>());
-    private final List<Evenement> evenements = Collections.synchronizedList(new ArrayList<>());
-    private final List<Reservation> reservations = Collections.synchronizedList(new ArrayList<>());
-    private final AtomicLong idGen = new AtomicLong(1);
 
-    // Authentication
-    public Utilisateur authentifier(String email, String motDePasse) {
-        synchronized(utilisateurs) {
-            return utilisateurs.stream()
-                .filter(u -> u.getEmail().equalsIgnoreCase(email) && u.getMotDePasse().equals(motDePasse))
-                .findFirst().orElse(null);
+    private final EvenementDao evenementDao;
+    private final ReservationDao reservationDao;
+    private final UtilisateurDao utilisateurDao;
+
+    public TicketService(EvenementDao evenementDao,
+                         ReservationDao reservationDao,
+                         UtilisateurDao utilisateurDao) {
+        this.evenementDao = evenementDao;
+        this.reservationDao = reservationDao;
+        this.utilisateurDao = utilisateurDao;
+    }
+
+    // ============================================================
+    // ===============     1. RESERVER          ===================
+    // ============================================================
+
+    public Reservation reserver(long clientId, long evenementId, int nbPlaces)
+            throws ServiceException {
+
+        try {
+            // CORRECTION : Vérifier null AVANT le cast
+            Utilisateur u = utilisateurDao.findById(clientId);
+            if (u == null) {
+                throw new ServiceException("Client introuvable.");
+            }
+            
+            if (!(u instanceof Client)) {
+                throw new ServiceException("Utilisateur non client");
+            }
+            Client client = (Client) u;
+
+            // Vérification de l'événement
+            Evenement ev = evenementDao.findById(evenementId);
+            if (ev == null) {
+                throw new ServiceException("Événement introuvable.");
+            }
+
+            // Validation du nombre de places
+            if (nbPlaces <= 0) {
+                throw new ServiceException("Nombre de places invalide.");
+            }
+
+            if (ev.getNbPlacesRestantes() < nbPlaces) {
+                throw new ServiceException("Pas assez de places disponibles.");
+            }
+
+            // Calcul du prix
+            double montant = nbPlaces * ev.getPrixBase();
+
+            // Création de la réservation
+            Reservation r = new Reservation(
+                    0,
+                    LocalDateTime.now(),
+                    nbPlaces,
+                    montant,
+                    client,
+                    ev
+            );
+
+            reservationDao.create(r);
+
+            // Mise à jour des places restantes
+            ev.setNbPlacesRestantes(ev.getNbPlacesRestantes() - nbPlaces);
+            evenementDao.update(ev);
+
+            return r;
+
+        } catch (DaoException e) {
+            throw new ServiceException("Erreur lors de la réservation", e);
         }
     }
 
-    // Evenements
-    public List<Evenement> listerEvenements() {
-        synchronized(evenements) {
-            return new ArrayList<>(evenements);
+    // ============================================================
+    // ===============     2. ANNULER           ===================
+    // ============================================================
+
+    public void annulerReservation(long reservationId, Client client) throws ServiceException {
+        try {
+            Reservation r = reservationDao.findById(reservationId);
+            if (r == null) {
+                throw new ServiceException("Réservation introuvable.");
+            }
+
+            if (r.getClient().getId() != client.getId()) {
+                throw new ServiceException("Vous ne pouvez annuler que vos propres réservations.");
+            }
+
+            if (r.getStatut() == StatutReservation.ANNULEE) {
+                throw new ServiceException("Réservation déjà annulée.");
+            }
+
+            LocalDate dateEvent = r.getEvenement().getDateEvenement().toLocalDate();
+            LocalDate aujourdHui = LocalDate.now();
+
+            if (!aujourdHui.isBefore(dateEvent)) {
+                throw new ServiceException("Annulation impossible : événement imminent.");
+            }
+
+            // Libérer les places
+            Evenement ev = r.getEvenement();
+            ev.setNbPlacesRestantes(ev.getNbPlacesRestantes() + r.getNbPlaces());
+            evenementDao.update(ev);
+
+            // Mise à jour du statut
+            r.setStatut(StatutReservation.ANNULEE);
+            reservationDao.update(r);
+
+        } catch (DaoException e) {
+            throw new ServiceException("Erreur annulation", e);
         }
     }
 
-    public Evenement trouverEvenementParId(long id) {
-        synchronized(evenements) {
-            return evenements.stream().filter(e -> e.getId() == id).findFirst().orElse(null);
+    // ============================================================
+    // ======= 3. CRÉATION / MODIFICATION ÉVÉNEMENT ===============
+    // ============================================================
+
+    public void creerEvenement(Evenement ev, long organisateurId) throws ServiceException {
+        try {
+            Utilisateur u = utilisateurDao.findById(organisateurId);
+            if (u == null) {
+                throw new ServiceException("Organisateur introuvable.");
+            }
+            
+            if (!(u instanceof Organisateur)) {
+                throw new ServiceException("Utilisateur non organisateur");
+            }
+            Organisateur org = (Organisateur) u;
+
+            ev.setOrganisateur(org);
+
+            if (ev.getNbPlacesRestantes() > ev.getNbPlacesTotales()) {
+                throw new ServiceException("Nb places restantes invalide.");
+            }
+
+            evenementDao.create(ev);
+
+        } catch (DaoException e) {
+            throw new ServiceException("Erreur création événement", e);
         }
     }
 
-    // Reservation
-    public Reservation reserver(Client client, long idEvenement, int nbPlaces) {
-        Evenement ev = trouverEvenementParId(idEvenement);
-        if (ev == null) throw new IllegalArgumentException("Evenement introuvable");
-        synchronized(ev) {
-            ev.reserverPlaces(nbPlaces);
+    public void modifierEvenement(Evenement ev, long organisateurId) throws ServiceException {
+        try {
+            Utilisateur u = utilisateurDao.findById(organisateurId);
+            if (u == null) {
+                throw new ServiceException("Organisateur introuvable.");
+            }
+            
+            if (!(u instanceof Organisateur)) {
+                throw new ServiceException("Utilisateur non organisateur");
+            }
+
+            if (ev.getNbPlacesRestantes() > ev.getNbPlacesTotales()) {
+                throw new ServiceException("Nb places restantes > nb total.");
+            }
+
+            evenementDao.update(ev);
+
+        } catch (DaoException e) {
+            throw new ServiceException("Erreur modification événement", e);
         }
-        long id = idGen.getAndIncrement();
-        double montant = nbPlaces * ev.getPrixBase();
-        Reservation r = new Reservation(id, LocalDateTime.now(), nbPlaces, montant, client, ev);
-        reservations.add(r);
-        return r;
     }
 
-    public List<Reservation> listerReservationsClient(Client client) {
-        synchronized(reservations) {
-            return reservations.stream()
-                .filter(r -> r.getClient().getId() == client.getId())
-                .collect(Collectors.toList());
+    // ============================================================
+    // ===============     4. LISTAGES         ====================
+    // ============================================================
+
+    public List<Evenement> listerEvenements() throws ServiceException {
+        try {
+            return evenementDao.findAll();
+        } catch (DaoException e) {
+            throw new ServiceException("Erreur récupération événements", e);
         }
     }
 
-    public void annulerReservation(long idReservation, Client client) {
-        Reservation r;
-        synchronized(reservations) {
-            r = reservations.stream().filter(x -> x.getId() == idReservation).findFirst().orElse(null);
+    public List<Evenement> listerEvenementsOrganisateur(long orgId) throws ServiceException {
+        try {
+            Utilisateur u = utilisateurDao.findById(orgId);
+            if (u == null) {
+                throw new ServiceException("Organisateur introuvable.");
+            }
+            
+            if (!(u instanceof Organisateur)) {
+                throw new ServiceException("Utilisateur non organisateur");
+            }
+            Organisateur org = (Organisateur) u;
+
+            return evenementDao.findByOrganisateur(org);
+
+        } catch (DaoException e) {
+            throw new ServiceException("Erreur liste événements organisateur", e);
         }
-        if (r == null) throw new IllegalArgumentException("Réservation introuvable");
-        if (r.getClient().getId() != client.getId()) throw new SecurityException("Accès refusé");
-        r.annuler();
     }
 
-    // Organisateur: creer evenement
-    public Evenement creerEvenement(Organisateur org, String titre, String description, LocalDateTime date, String lieu, int nbPlacesTotales, double prixBase) {
-        long id = idGen.getAndIncrement();
-        Evenement e = new Evenement(id, titre, description, date, lieu, nbPlacesTotales, prixBase);
-        evenements.add(e);
-        return e;
+    public List<Reservation> listerReservationsClient(long clientId) throws ServiceException {
+        try {
+            Utilisateur u = utilisateurDao.findById(clientId);
+            if (u == null) {
+                throw new ServiceException("Client introuvable.");
+            }
+            
+            if (!(u instanceof Client)) {
+                throw new ServiceException("Utilisateur non client");
+            }
+            Client client = (Client) u;
+
+            return reservationDao.findByClient(client);
+
+        } catch (DaoException e) {
+            throw new ServiceException("Erreur liste réservations client", e);
+        }
     }
 
-    // Utilisateurs: helper pour l'init
-    public Utilisateur creerUtilisateur(Utilisateur u) {
-        u.setId(idGen.getAndIncrement());
-        utilisateurs.add(u);
-        return u;
+    // ============================================================
+    // ============   5. RÉCUPÉRATION SIMPLE   ====================
+    // ============================================================
+
+    public Evenement getEvenement(long id) throws ServiceException {
+        try {
+            return evenementDao.findById(id);
+        } catch (DaoException e) {
+            throw new ServiceException("Erreur getEvenement", e);
+        }
     }
 
-    // Getters (pour debug / affichage)
-    public List<Utilisateur> getUtilisateurs() { return new ArrayList<>(utilisateurs); }
-    public List<Evenement> getEvenements() { return new ArrayList<>(evenements); }
-    public List<Reservation> getReservations() { return new ArrayList<>(reservations); }
+    // ============================================================
+    // ============ 6. AUTHENTIFICATION ==========================
+    // ============================================================
+
+    public Utilisateur authentifier(String email, String password) throws ServiceException {
+        try {
+            Utilisateur u = utilisateurDao.findByEmail(email);
+            if (u != null && u.getMotDePasse().equals(password)) {
+                return u;
+            }
+            return null;
+        } catch (DaoException e) {
+            throw new ServiceException("Erreur authentification", e);
+        }
+    }
+
+    public Client getClient(long id) throws ServiceException {
+        try {
+            Utilisateur u = utilisateurDao.findById(id);
+            if (u == null) {
+                return null;
+            }
+            if (!(u instanceof Client)) {
+                throw new ServiceException("Utilisateur trouvé n'est pas un client");
+            }
+            return (Client) u;
+        } catch (DaoException e) {
+            throw new ServiceException("Erreur getClient", e);
+        }
+    }
+
+    public Reservation getReservation(long id) throws ServiceException {
+        try {
+            return reservationDao.findById(id);
+        } catch (DaoException e) {
+            throw new ServiceException("Erreur getReservation", e);
+        }
+    }
 }

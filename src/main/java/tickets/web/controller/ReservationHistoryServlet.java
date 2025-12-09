@@ -1,41 +1,68 @@
 package tickets.web.controller;
 
-import tickets.model.*;
+import tickets.model.Client;
+import tickets.model.Reservation;
 import tickets.service.TicketService;
-
+import tickets.service.ServiceException;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.List;
 
 @WebServlet("/reservations/history")
 public class ReservationHistoryServlet extends HttpServlet {
+    
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        TicketService service = (TicketService) getServletContext().getAttribute("ticketService");
-        HttpSession s = req.getSession(false);
-        Client client = (Client) s.getAttribute("user");
-        if (client == null) { resp.sendRedirect(req.getContextPath() + "/login"); return; }
-
-        List<Reservation> list = service.listerReservationsClient(client);
-        resp.setContentType("text/html; charset=UTF-8");
-        PrintWriter out = resp.getWriter();
-        out.println("<html><body>");
-        out.println("<h2>Mes réservations</h2>");
-        out.println("<a href='" + req.getContextPath() + "/events'>Retour aux événements</a><br/>");
-        out.println("<ul>");
-        for (Reservation r : list) {
-            out.println("<li>Réf: " + r.getId() + " - " + r.getEvenement().getTitre() + " - nb: " + r.getNbPlaces() + " - statut: " + r.getStatut());
-            if (r.getStatut() == StatutReservation.CONFIRMEE) {
-                out.println("<form method='post' action='" + req.getContextPath() + "/reservations/cancel' style='display:inline;'>");
-                out.println("<input type='hidden' name='reservationId' value='" + r.getId() + "'/> ");
-                out.println("<button type='submit'>Annuler</button>");
-                out.println("</form>");
-            }
-            out.println("</li>");
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) 
+            throws ServletException, IOException {
+        
+        HttpSession session = req.getSession(false);
+        
+        // Vérification de la session
+        if (session == null) {
+            resp.sendRedirect(req.getContextPath() + "/login");
+            return;
         }
-        out.println("</ul>");
-        out.println("</body></html>");
+        
+        Client client = (Client) session.getAttribute("user");
+        if (client == null) {
+            resp.sendRedirect(req.getContextPath() + "/login");
+            return;
+        }
+        
+        TicketService service = (TicketService) getServletContext().getAttribute("ticketService");
+        
+        // Vérification que le service est initialisé
+        if (service == null) {
+            resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
+                "Service non disponible");
+            return;
+        }
+        
+        try {
+            // Récupération des réservations du client
+            List<Reservation> reservations = service.listerReservationsClient(client.getId());
+            
+            // Même si la liste est vide, on la passe à la JSP
+            if (reservations == null) {
+                reservations = List.of(); // Liste vide au lieu de null
+            }
+            
+            req.setAttribute("reservations", reservations);
+            req.getRequestDispatcher("/WEB-INF/jsp/reservations.jsp").forward(req, resp);
+            
+        } catch (ServiceException e) {
+            // Logger l'erreur
+            e.printStackTrace();
+            resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
+                "Erreur lors de la récupération des réservations : " + e.getMessage());
+            
+        } catch (Exception e) {
+            // Erreur inattendue
+            e.printStackTrace();
+            resp.sendError(HttpServletResponse.SC_INTERNAL_SERVER_ERROR, 
+                "Erreur technique : " + e.getMessage());
+        }
     }
 }

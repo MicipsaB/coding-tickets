@@ -1,44 +1,100 @@
 package tickets.web.listener;
-import tickets.service.TicketService;
-import tickets.model.*;
 
+import tickets.service.TicketService;
+import tickets.dao.jdbc.*;
+import tickets.dao.*;
 import jakarta.servlet.ServletContext;
 import jakarta.servlet.ServletContextEvent;
 import jakarta.servlet.ServletContextListener;
 import jakarta.servlet.annotation.WebListener;
-import java.time.LocalDateTime;
+
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.SQLException;
 
 @WebListener
 public class AppInitListener implements ServletContextListener {
+
     @Override
     public void contextInitialized(ServletContextEvent sce) {
-        TicketService ticketService = new TicketService();
+        try {
+            Class.forName("org.postgresql.Driver");
 
-        // Création d'utilisateurs de test
-        Client c1 = new Client(0, "batman", "batman@mail.com", "passe");
-        Client c2 = new Client(0, "spiderman", "spiderman@mail.com", "passe");
-        Client c3 = new Client(0, "flash", "flash@mail.com", "passe");
-        Client c4 = new Client(0, "joker", "joker@mail.com", "passe");
-        
-        Organisateur o1 = new Organisateur(0, "orga1", "orga1@mail.com", "admin");
-        Organisateur o2 = new Organisateur(0, "orga2", "orga2@mail.com", "admin");
-        
-        ticketService.creerUtilisateur(c1);
-        ticketService.creerUtilisateur(c2);
-        ticketService.creerUtilisateur(c3);
-        ticketService.creerUtilisateur(c4);
-        ticketService.creerUtilisateur(o1);
+            String url = System.getenv("DB_URL");
+            String user = System.getenv("DB_USER");
+            String password = System.getenv("DB_PASSWORD");
 
-        // Création d'événements de test
-        ticketService.creerEvenement(o1, "Concert de blues", "soirée de blues", LocalDateTime.now().plusDays(10), "Zénith", 100, 20.0);
-        ticketService.creerEvenement(o1, "Conférence", "Conférence de presse", LocalDateTime.now().plusDays(5), "Villette", 50, 0.0);
+            // Fallback si tu lances hors Docker
+            if (url == null) {
+                url = "jdbc:postgresql://localhost:5432/ticketing";
+                user = "postgres";
+                password = "password";
+            }
 
-        ServletContext context = sce.getServletContext();
-        context.setAttribute("ticketService", ticketService);
+            System.out.println("🔄 Configuration DB:");
+            System.out.println("   URL: " + url);
+            System.out.println("   User: " + user);
+
+            // Retry logic robuste
+            Connection conn = connectWithRetry(url, user, password, 20, 3000);
+
+            UtilisateurDao utilisateurDao = new JdbcUtilisateurDao(conn);
+            EvenementDao evenementDao = new JdbcEvenementDao(conn);
+            ReservationDao reservationDao = new JdbcReservationDao(conn);
+
+            TicketService ticketService =
+                    new TicketService(evenementDao, reservationDao, utilisateurDao);
+
+            ServletContext context = sce.getServletContext();
+            context.setAttribute("ticketService", ticketService);
+
+            System.out.println("✅ Application initialisée avec succès");
+
+        } catch (ClassNotFoundException e) {
+            System.err.println("❌ Driver PostgreSQL non trouvé");
+            e.printStackTrace();
+            throw new RuntimeException("Driver PostgreSQL manquant", e);
+        } catch (Exception e) {
+            System.err.println("❌ Erreur initialisation application: " + e.getMessage());
+            e.printStackTrace();
+            throw new RuntimeException("Erreur initialisation application", e);
+        }
+    }
+
+    private Connection connectWithRetry(String url, String user, String password, 
+                                        int maxRetries, int delayMs) throws SQLException {
+        Connection conn = null;
+        int attempt = 0;
+        SQLException lastException = null;
+
+        while (conn == null && attempt < maxRetries) {
+            attempt++;
+            try {
+                System.out.println("🔄 Tentative de connexion " + attempt + "/" + maxRetries + "...");
+                conn = DriverManager.getConnection(url, user, password);
+                System.out.println("✅ Connexion établie à la base de données");
+                return conn;
+            } catch (SQLException e) {
+                lastException = e;
+                System.err.println("⚠️  Échec connexion (tentative " + attempt + "): " + e.getMessage());
+                
+                if (attempt < maxRetries) {
+                    try {
+                        System.out.println("⏳ Attente de " + delayMs + "ms avant nouvelle tentative...");
+                        Thread.sleep(delayMs);
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new SQLException("Connexion interrompue", ie);
+                    }
+                }
+            }
+        }
+
+        throw new SQLException("Impossible de se connecter après " + maxRetries + " tentatives", lastException);
     }
 
     @Override
     public void contextDestroyed(ServletContextEvent sce) {
-        // rien
+        System.out.println("🛑 Application arrêtée");
     }
 }
