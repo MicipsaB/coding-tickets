@@ -44,15 +44,5 @@ public Evenement getEvenement() { return evenement; }
 public void setEvenement(Evenement evenement) { this.evenement = evenement; }
 
 
-// Méthode métier: annuler
-public synchronized void annuler() {
-if (statut == StatutReservation.ANNULEE) return;
-// Règle simplifiée: annulation possible sauf si événement dans moins d'un jour
-LocalDateTime now = LocalDateTime.now();
-if (evenement.getDate().isBefore(now.plusDays(1))) {
-throw new AnnulationTardiveException("Annulation trop tardive");
-}
-evenement.annulerPlaces(nbPlaces);
-statut = StatutReservation.ANNULEE;
-}
+
 }

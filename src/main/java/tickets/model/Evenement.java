@@ -2,65 +2,71 @@ package tickets.model;
 
 import java.time.LocalDateTime;
 
-
 public class Evenement {
-private long id;
-private String titre;
-private String description;
-private LocalDateTime date;
-private String lieu;
-private int nbPlacesTotales;
-private int nbPlacesRestantes;
-private double prixBase;
 
+    private long id;
+    private String titre;
+    private String description;
+    private String lieu;
+    private LocalDateTime dateEvenement;
+    private int nbPlacesTotales;
+    private int nbPlacesRestantes;
+    private double prixBase;
+    private Organisateur organisateur;
 
-public Evenement() {}
+    // --- Constructeur complet (utilisé par JDBC) ---
+    public Evenement(long id, String titre, String description, String lieu,
+                     LocalDateTime dateEvenement, int nbPlacesTotales,
+                     int nbPlacesRestantes, double prixBase, Organisateur organisateur) {
 
+        this.id = id;
+        this.titre = titre;
+        this.description = description;
+        this.lieu = lieu;
+        this.dateEvenement = dateEvenement;
+        this.nbPlacesTotales = nbPlacesTotales;
+        this.nbPlacesRestantes = nbPlacesRestantes;
+        this.prixBase = prixBase;
+        this.organisateur = organisateur;
+    }
 
-public Evenement(long id, String titre, String description, LocalDateTime date, String lieu, int nbPlacesTotales, double prixBase) {
-this.id = id;
-this.titre = titre;
-this.description = description;
-this.date = date;
-this.lieu = lieu;
-this.nbPlacesTotales = nbPlacesTotales;
-this.nbPlacesRestantes = nbPlacesTotales;
-this.prixBase = prixBase;
-}
+    // --- Constructeur SANS organisateur (utilisé côté DAO lors de jointure minimale) ---
+    public Evenement(long id, String titre, String description, String lieu,
+                     LocalDateTime dateEvenement, int nbPlacesTotales,
+                     int nbPlacesRestantes, double prixBase) {
 
+        this(id, titre, description, lieu, dateEvenement,
+             nbPlacesTotales, nbPlacesRestantes, prixBase, null);
+    }
 
-// Getters/Setters
-public long getId() { return id; }
-public void setId(long id) { this.id = id; }
-public String getTitre() { return titre; }
-public void setTitre(String titre) { this.titre = titre; }
-public String getDescription() { return description; }
-public void setDescription(String description) { this.description = description; }
-public LocalDateTime getDate() { return date; }
-public void setDate(LocalDateTime date) { this.date = date; }
-public String getLieu() { return lieu; }
-public void setLieu(String lieu) { this.lieu = lieu; }
-public int getNbPlacesTotales() { return nbPlacesTotales; }
-public void setNbPlacesTotales(int nbPlacesTotales) { this.nbPlacesTotales = nbPlacesTotales; }
-public int getNbPlacesRestantes() { return nbPlacesRestantes; }
-public void setNbPlacesRestantes(int nbPlacesRestantes) { this.nbPlacesRestantes = nbPlacesRestantes; }
-public double getPrixBase() { return prixBase; }
-public void setPrixBase(double prixBase) { this.prixBase = prixBase; }
+    // --- Constructeur vide (obligatoire pour JSP/Servlets) ---
+    public Evenement() {}
 
+    // --- Getters / Setters ---
+    public long getId() { return id; }
+    public void setId(long id) { this.id = id; }
 
-// Méthodes métier
-public synchronized void reserverPlaces(int nb) {
-if (nb <= 0) throw new IllegalArgumentException("Le nombre de places doit être positif");
-if (nb > nbPlacesRestantes) {
-throw new PlacesInsuffisantesException("Pas assez de places disponibles");
-}
-nbPlacesRestantes -= nb;
-}
+    public String getTitre() { return titre; }
+    public void setTitre(String titre) { this.titre = titre; }
 
+    public String getDescription() { return description; }
+    public void setDescription(String description) { this.description = description; }
 
-public synchronized void annulerPlaces(int nb) {
-if (nb <= 0) throw new IllegalArgumentException("Le nombre de places doit être positif");
-nbPlacesRestantes += nb;
-if (nbPlacesRestantes > nbPlacesTotales) nbPlacesRestantes = nbPlacesTotales;
-}
+    public String getLieu() { return lieu; }
+    public void setLieu(String lieu) { this.lieu = lieu; }
+
+    public LocalDateTime getDateEvenement() { return dateEvenement; }
+    public void setDateEvenement(LocalDateTime dateEvenement) { this.dateEvenement = dateEvenement; }
+
+    public int getNbPlacesTotales() { return nbPlacesTotales; }
+    public void setNbPlacesTotales(int nbPlacesTotales) { this.nbPlacesTotales = nbPlacesTotales; }
+
+    public int getNbPlacesRestantes() { return nbPlacesRestantes; }
+    public void setNbPlacesRestantes(int nbPlacesRestantes) { this.nbPlacesRestantes = nbPlacesRestantes; }
+
+    public double getPrixBase() { return prixBase; }
+    public void setPrixBase(double prixBase) { this.prixBase = prixBase; }
+
+    public Organisateur getOrganisateur() { return organisateur; }
+    public void setOrganisateur(Organisateur organisateur) { this.organisateur = organisateur; }
 }

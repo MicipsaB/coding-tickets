@@ -1,7 +1,70 @@
-# Dossier Eclipse à ignorer
-.metadata/
-
-# Autres dossiers Eclipse à ignorer (bonne pratique)
-.settings/
-bin/
+# ----------------------
+# Java / Maven
+# ----------------------
 target/
+build/
+*.class
+*.log
+*.jar
+*.war
+*.ear
+*.iml
+*.ipr
+*.iws
+out/
+
+# Maven local repo
+/.mvn/
+/dependency-reduced-pom.xml
+/release.properties
+/buildNumber.properties
+
+# ----------------------
+# IDEs (IntelliJ, Eclipse, VSCode)
+# ----------------------
+*.idea/
+*.project
+*.classpath
+*.settings/
+.vscode/
+*.launch
+
+# ----------------------
+# Tomcat / Application server
+# ----------------------
+logs/
+work/
+temp/
+*.tmp
+*.bak
+*.swp
+*.cache
+
+# ----------------------
+# PostgreSQL / Database
+# ----------------------
+*.sql~
+*.backup
+*.db
+*.sqlite
+*.pgpass
+
+# ----------------------
+# OS generated files
+# ----------------------
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+
+# ----------------------
+# Node / frontend (if any)
+# ----------------------
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# ----------------------
+# Ignore sensitive environment files
+# ----------------------
+*.env
