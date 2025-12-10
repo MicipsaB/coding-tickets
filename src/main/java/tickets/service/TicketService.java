@@ -2,6 +2,7 @@ package tickets.service;
 
 import tickets.dao.*;
 import tickets.model.*;
+import tickets.util.PasswordUtil;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -241,7 +242,7 @@ public class TicketService {
     public Utilisateur authentifier(String email, String password) throws ServiceException {
         try {
             Utilisateur u = utilisateurDao.findByEmail(email);
-            if (u != null && u.getMotDePasse().equals(password)) {
+            if (u != null && PasswordUtil.verify(password, u.getMotDePasse())) {
                 return u;
             }
             return null;

@@ -64,11 +64,11 @@ CREATE TABLE reservation (
 -- ===========================================
 
 INSERT INTO utilisateur (nom, email, mot_de_passe, role) VALUES
-('Batman', 'batman@mail.com', 'passe', 'CLIENT'),
-('Spiderman', 'spiderman@mail.com', 'passe', 'CLIENT'),
-('queen', 'queen@mail.com', 'passe', 'CLIENT'),
-('Antman', 'antman@mail.com', 'admin', 'ORGANISATEUR'),
-('joker', 'joker@mail.com', 'admin', 'ORGANISATEUR');
+('Batman', 'batman@mail.com', '556972429c265aab19b92b814d2ffe9b2b4dc7e99176aae6e211ad425a37ec15', 'CLIENT'),
+('Spiderman', 'spiderman@mail.com', '556972429c265aab19b92b814d2ffe9b2b4dc7e99176aae6e211ad425a37ec15', 'CLIENT'),
+('queen', 'queen@mail.com', '556972429c265aab19b92b814d2ffe9b2b4dc7e99176aae6e211ad425a37ec15', 'CLIENT'),
+('Antman', 'antman@mail.com', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', 'ORGANISATEUR'),
+('joker', 'joker@mail.com', '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', 'ORGANISATEUR');
 
 -- ===========================================
 -- Insertion d'événements exemples
