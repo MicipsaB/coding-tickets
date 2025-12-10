@@ -1,5 +1,7 @@
 <%@ page contentType="text/html;charset=UTF-8" language="java" %>
 <%@ taglib uri="http://java.sun.com/jsp/jstl/core" prefix="c" %>
+<%@ taglib uri="http://java.sun.com/jsp/jstl/fmt" prefix="fmt" %>
+
 <html>
 <head>
     <title>Mes réservations</title>
@@ -25,7 +27,7 @@
         <c:forEach var="r" items="${reservations}">
             <tr>
                 <td>${r.evenement.titre}</td>
-                <td>${r.evenement.dateEvenement}</td>
+                <td>${r.evenement.dateEvenementFormatted}</td>
                 <td>${r.nbPlaces}</td>
                 <td>${r.statut}</td>
                 <td>${r.montantTotal}</td>

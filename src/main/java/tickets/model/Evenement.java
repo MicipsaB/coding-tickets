@@ -1,5 +1,6 @@
 package tickets.model;
 
+import java.time.format.DateTimeFormatter;
 import java.time.LocalDateTime;
 
 public class Evenement {
@@ -69,4 +70,11 @@ public class Evenement {
 
     public Organisateur getOrganisateur() { return organisateur; }
     public void setOrganisateur(Organisateur organisateur) { this.organisateur = organisateur; }
+    
+ // Nouveau getter formaté
+    public String getDateEvenementFormatted() {
+        if (dateEvenement == null) return "";
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
+        return dateEvenement.format(formatter);
+    }
 }
